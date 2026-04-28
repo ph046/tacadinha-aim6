@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center"
+    android:padding="32dp" android:background="#0D0D0D">
+    <TextView android:text="🎱" android:textSize="64sp" android:gravity="center"
+        android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="8dp"/>
+    <TextView android:text="TACADINHA AUTO" android:textSize="26sp" android:textStyle="bold"
+        android:textColor="#00FF88" android:gravity="center"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    <TextView android:text="Mira automatica" android:textSize="13sp" android:textColor="#666666"
+        android:gravity="center" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:layout_marginBottom="32dp"/>
+    <TextView android:id="@+id/tvStatus" android:text="Verificando..."
+        android:textSize="15sp" android:textColor="#AAAAAA" android:gravity="center"
+        android:padding="16dp" android:background="#1A1A1A" android:layout_marginBottom="24dp"
+        android:layout_width="match_parent" android:layout_height="wrap_content"/>
+    <Button android:id="@+id/btnAccessibility" android:text="1. ATIVAR ACESSIBILIDADE"
+        android:textSize="14sp" android:textColor="#000000"
+        android:layout_width="match_parent" android:layout_height="52dp"
+        android:layout_marginBottom="12dp" android:backgroundTint="#FFD700"/>
+    <Button android:id="@+id/btnStart" android:text="2. INICIAR MIRA AUTO"
+        android:textSize="14sp" android:textColor="#000000"
+        android:layout_width="match_parent" android:layout_height="52dp"
+        android:layout_marginBottom="12dp" android:backgroundTint="#00FF88"/>
+    <Button android:id="@+id/btnStop" android:text="PARAR"
+        android:textSize="14sp" android:textColor="#FFFFFF"
+        android:layout_width="match_parent" android:layout_height="52dp"
+        android:backgroundTint="#333333"/>
+    <TextView android:text="Como usar:\n1. Toque ATIVAR ACESSIBILIDADE\n2. Ative Tacadinha Auto na lista\n3. Volte aqui e toque INICIAR\n4. Abra seu jogo de sinuca\n5. Toque no botao verde para mirar\n6. So voce da a forca no taco!"
+        android:textSize="12sp" android:textColor="#555555"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="24dp" android:lineSpacingExtra="4dp"/>
+</LinearLayout>
