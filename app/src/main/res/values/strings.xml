@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tacadinha Auto</string>
+    <string name="accessibility_label">Tacadinha Auto - Mira</string>
+    <string name="accessibility_desc">Permite mirar o taco automaticamente</string>
+</resources>
