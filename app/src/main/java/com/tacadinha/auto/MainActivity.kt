@@ -1,8 +1,11 @@
 package com.tacadinha.auto
 
+import android.Manifest
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionConfig
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
@@ -12,12 +15,15 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
     companion object {
         const val REQ_PROJECTION = 1001
         const val REQ_OVERLAY = 1002
+        const val REQ_NOTIFICATION = 1003
     }
 
     private lateinit var pm: MediaProjectionManager
@@ -29,6 +35,8 @@ class MainActivity : AppCompatActivity() {
 
         pm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         tvStatus = findViewById(R.id.tvStatus)
+
+        requestNotificationPermissionIfNeeded()
 
         findViewById<Button>(R.id.btnStart).setOnClickListener {
             checkAndStart()
@@ -90,7 +98,19 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        startActivityForResult(pm.createScreenCaptureIntent(), REQ_PROJECTION)
+        startScreenCapture()
+    }
+
+    private fun startScreenCapture() {
+        val captureIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            pm.createScreenCaptureIntent(
+                MediaProjectionConfig.createConfigForDefaultDisplay()
+            )
+        } else {
+            pm.createScreenCaptureIntent()
+        }
+
+        startActivityForResult(captureIntent, REQ_PROJECTION)
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
@@ -109,6 +129,23 @@ class MainActivity : AppCompatActivity() {
         return enabledServices
             .split(":")
             .any { it.equals(expected, ignoreCase = true) }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (!granted) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    REQ_NOTIFICATION
+                )
+            }
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -141,12 +178,12 @@ class MainActivity : AppCompatActivity() {
                         startService(i)
                     }
 
-                    tvStatus.text = "🎱 Mira automática ATIVA!"
+                    tvStatus.text = "🎱 Captura ATIVA!"
                     tvStatus.setTextColor(0xFF00FF88.toInt())
 
                     Toast.makeText(
                         this,
-                        "Abra seu jogo e toque no botão verde!",
+                        "Agora abra o jogo em tela cheia e toque no botão verde.",
                         Toast.LENGTH_LONG
                     ).show()
 
