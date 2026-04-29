@@ -16,7 +16,14 @@ class AimAccessibilityService : AccessibilityService() {
     companion object {
         @Volatile
         var instance: AimAccessibilityService? = null
+
+        private const val DRAG_RADIUS = 260f
+        private const val GESTURE_DURATION_MS = 130L
+        private const val START_BACK_FACTOR = 0.45f
+        private const val END_FORWARD_FACTOR = 1.15f
     }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -24,11 +31,11 @@ class AimAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Não precisa fazer nada aqui por enquanto
+        // Não precisa ler eventos da tela.
     }
 
     override fun onInterrupt() {
-        // Chamado quando o Android interrompe o serviço
+        // Chamado quando o Android interrompe o serviço.
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
@@ -49,15 +56,18 @@ class AimAccessibilityService : AccessibilityService() {
         try {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
 
-            if (!cueX.isFinite() || !cueY.isFinite() || angleRad.isNaN()) return
+            if (!cueX.isFinite() || !cueY.isFinite() || angleRad.isNaN()) {
+                return
+            }
 
-            val dragRadius = 200f
+            val dirX = cos(angleRad).toFloat()
+            val dirY = sin(angleRad).toFloat()
 
-            val startX = cueX - (cos(angleRad) * dragRadius * 0.5f).toFloat()
-            val startY = cueY - (sin(angleRad) * dragRadius * 0.5f).toFloat()
+            val startX = cueX - dirX * DRAG_RADIUS * START_BACK_FACTOR
+            val startY = cueY - dirY * DRAG_RADIUS * START_BACK_FACTOR
 
-            val endX = cueX + (cos(angleRad) * dragRadius).toFloat()
-            val endY = cueY + (sin(angleRad) * dragRadius).toFloat()
+            val endX = cueX + dirX * DRAG_RADIUS * END_FORWARD_FACTOR
+            val endY = cueY + dirY * DRAG_RADIUS * END_FORWARD_FACTOR
 
             val path = Path().apply {
                 moveTo(startX, startY)
@@ -69,25 +79,29 @@ class AimAccessibilityService : AccessibilityService() {
                     GestureDescription.StrokeDescription(
                         path,
                         0L,
-                        350L
+                        GESTURE_DURATION_MS
                     )
                 )
                 .build()
 
-            Handler(Looper.getMainLooper()).post {
-                dispatchGesture(
-                    gesture,
-                    object : GestureResultCallback() {
-                        override fun onCompleted(gestureDescription: GestureDescription?) {
-                            super.onCompleted(gestureDescription)
-                        }
+            mainHandler.post {
+                try {
+                    dispatchGesture(
+                        gesture,
+                        object : GestureResultCallback() {
+                            override fun onCompleted(gestureDescription: GestureDescription?) {
+                                super.onCompleted(gestureDescription)
+                            }
 
-                        override fun onCancelled(gestureDescription: GestureDescription?) {
-                            super.onCancelled(gestureDescription)
-                        }
-                    },
-                    null
-                )
+                            override fun onCancelled(gestureDescription: GestureDescription?) {
+                                super.onCancelled(gestureDescription)
+                            }
+                        },
+                        null
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
 
         } catch (e: Exception) {
