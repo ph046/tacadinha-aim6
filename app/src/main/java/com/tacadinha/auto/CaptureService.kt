@@ -19,7 +19,15 @@ class CaptureService : Service() {
     companion object {
         const val CH = "tac_auto"
         const val NID = 55
-        const val DEBUG_SAVE_CAPTURE = true
+
+        // Deixe false para ficar rápido.
+        const val DEBUG_SAVE_CAPTURE = false
+
+        // Deixe false para não ficar mostrando mensagem toda hora.
+        const val DEBUG_TOASTS = false
+
+        // Se mirar invertido, troque para true.
+        const val INVERT_AIM = false
     }
 
     private var projection: MediaProjection? = null
@@ -33,7 +41,12 @@ class CaptureService : Service() {
     private var sh = 0
     private var dpi = 0
 
-    private val handler = Handler(Looper.getMainLooper())
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private lateinit var processingThread: HandlerThread
+    private lateinit var processingHandler: Handler
+
+    private var isProcessing = false
 
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
@@ -47,6 +60,10 @@ class CaptureService : Service() {
         super.onCreate()
 
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
+
+        processingThread = HandlerThread("TacadinhaProcessing")
+        processingThread.start()
+        processingHandler = Handler(processingThread.looper)
 
         refreshScreenMetrics()
         createChannel()
@@ -82,7 +99,7 @@ class CaptureService : Service() {
 
             projection?.registerCallback(
                 projectionCallback,
-                handler
+                mainHandler
             )
 
             reader = ImageReader.newInstance(
@@ -100,14 +117,14 @@ class CaptureService : Service() {
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 reader?.surface,
                 null,
-                handler
+                mainHandler
             )
 
             if (floatBtn == null) {
                 addFloatingButton()
             }
 
-            ToastHelper.show(this, "Captura iniciada: ${sw}x${sh}")
+            debugToast("Captura iniciada: ${sw}x${sh}")
 
         } catch (e: Exception) {
             e.printStackTrace()
@@ -169,7 +186,7 @@ class CaptureService : Service() {
             } catch (_: Exception) {
             }
 
-            ToastHelper.show(this, "Orientação ajustada: ${sw}x${sh}")
+            ToastHelper.show(this, "Orientação ajustada. Toque de novo.")
             true
 
         } catch (e: Exception) {
@@ -262,6 +279,8 @@ class CaptureService : Service() {
     }
 
     private fun triggerAutoAim() {
+        if (isProcessing) return
+
         val svc = AimAccessibilityService.instance
         if (svc == null) {
             ToastHelper.show(this, "Acessibilidade não conectada")
@@ -269,16 +288,15 @@ class CaptureService : Service() {
         }
 
         val resized = resizeCaptureIfNeeded()
-        if (resized) {
-            ToastHelper.show(this, "Toque no botão verde de novo")
-            return
-        }
+        if (resized) return
 
         val image = reader?.acquireLatestImage()
         if (image == null) {
-            ToastHelper.show(this, "Imagem ainda não disponível")
+            debugToast("Imagem ainda não disponível")
             return
         }
+
+        isProcessing = true
 
         try {
             val plane = image.planes[0]
@@ -291,7 +309,8 @@ class CaptureService : Service() {
             val rowStride = plane.rowStride
 
             if (pixelStride <= 0 || rowStride <= 0) {
-                ToastHelper.show(this, "Frame inválido")
+                debugToast("Frame inválido")
+                isProcessing = false
                 return
             }
 
@@ -317,7 +336,7 @@ class CaptureService : Service() {
                 saveDebugImage(finalBmp)
             }
 
-            handler.post {
+            processingHandler.post {
                 try {
                     val result = Detector.analyze(
                         finalBmp,
@@ -329,54 +348,50 @@ class CaptureService : Service() {
                     val balls = result.second
                     val pockets = result.third
 
-                    ToastHelper.show(
-                        this,
-                        "Taco: ${cue != null} | Bolas: ${balls.size} | Buracos: ${pockets.size}"
-                    )
-
-                    finalBmp.recycle()
-
-                    if (cue == null) {
-                        ToastHelper.show(this, "Não achei o taco")
-                        return@post
+                    if (!finalBmp.isRecycled) {
+                        finalBmp.recycle()
                     }
 
-                    if (balls.isEmpty()) {
-                        ToastHelper.show(this, "Não achei bolas")
+                    if (cue == null || balls.isEmpty()) {
+                        debugToast("Não reconheceu mesa")
                         return@post
                     }
 
                     val shot = ShotCalculator.bestShot(cue, balls, pockets)
-                    if (shot == null) {
-                        ToastHelper.show(this, "Não achei tacada possível")
-                        return@post
-                    }
+                        ?: return@post
 
                     if (!shot.willScore) {
-                        ToastHelper.show(this, "Tacada calculada, mas não encaçapa")
                         return@post
                     }
 
-                    ToastHelper.show(this, "Mira calculada. Executando...")
+                    val finalAngle = if (INVERT_AIM) {
+                        shot.angleRad + Math.PI
+                    } else {
+                        shot.angleRad
+                    }
 
-                    handler.postDelayed({
-                        svc.aimCue(cue.x, cue.y, shot.angleRad)
-                    }, 300L)
+                    mainHandler.postDelayed({
+                        svc.aimCue(cue.x, cue.y, finalAngle)
+                    }, 60L)
 
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    ToastHelper.show(this, "Erro no Detector ou ShotCalculator")
+                    debugToast("Erro no cálculo")
 
                     try {
                         if (!finalBmp.isRecycled) finalBmp.recycle()
                     } catch (_: Exception) {
                     }
+
+                } finally {
+                    isProcessing = false
                 }
             }
 
         } catch (e: Exception) {
             e.printStackTrace()
-            ToastHelper.show(this, "Erro ao processar imagem")
+            isProcessing = false
+            debugToast("Erro ao processar imagem")
         } finally {
             try {
                 image.close()
@@ -407,11 +422,17 @@ class CaptureService : Service() {
                 null
             )
 
-            ToastHelper.show(this, "Print salvo: ${bitmap.width}x${bitmap.height}")
+            debugToast("Print salvo: ${bitmap.width}x${bitmap.height}")
 
         } catch (e: Exception) {
             e.printStackTrace()
-            ToastHelper.show(this, "Erro ao salvar print")
+            debugToast("Erro ao salvar print")
+        }
+    }
+
+    private fun debugToast(msg: String) {
+        if (DEBUG_TOASTS) {
+            ToastHelper.show(this, msg)
         }
     }
 
@@ -450,6 +471,11 @@ class CaptureService : Service() {
         }
 
         projection = null
+
+        try {
+            processingThread.quitSafely()
+        } catch (_: Exception) {
+        }
 
         super.onDestroy()
     }
