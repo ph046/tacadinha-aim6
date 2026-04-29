@@ -14,8 +14,8 @@ data class Shot(
 
 object ShotCalculator {
 
-    private const val MAX_CUT_ANGLE_DEG = 52.0
-    private const val EASY_CUT_ANGLE_DEG = 22.0
+    private const val MAX_CUT_ANGLE_DEG = 52f
+    private const val EASY_CUT_ANGLE_DEG = 22f
     private const val PATH_CLEARANCE_FACTOR = 1.12f
     private const val GHOST_FACTOR = 0.98f
 
@@ -28,7 +28,9 @@ object ShotCalculator {
 
         val cleanBalls = balls
             .filter { it.r in 7f..36f }
-            .filter { distance(it.x, it.y, cue.x, cue.y) > cue.r + it.r + 3f }
+            .filter {
+                distance(it.x, it.y, cue.x, cue.y) > cue.r + it.r + 3f
+            }
 
         if (cleanBalls.isEmpty()) return null
 
@@ -112,7 +114,7 @@ object ShotCalculator {
             targetPocketAngle
         )
 
-        val maxCut = Math.toRadians(MAX_CUT_ANGLE_DEG)
+        val maxCut = Math.toRadians(MAX_CUT_ANGLE_DEG.toDouble())
 
         if (cutAngle > maxCut) return null
 
@@ -148,14 +150,17 @@ object ShotCalculator {
 
         val cutDeg = Math.toDegrees(cutAngle).toFloat()
 
-        val straightScore = when {
-            cutDeg <= EASY_CUT_ANGLE_DEG -> 3200f
-            else -> 3200f * (1f - (cutDeg / MAX_CUT_ANGLE_DEG).coerceIn(0f, 1f))
+        val straightScore = if (cutDeg <= EASY_CUT_ANGLE_DEG) {
+            3200f
+        } else {
+            val cutRatio = (cutDeg / MAX_CUT_ANGLE_DEG).coerceIn(0f, 1f)
+            3200f * (1f - cutRatio)
         }
 
-        val distanceScore = 2600f -
-                cueToGhostDist * 0.85f -
-                targetToPocketDist * 0.55f
+        val distanceScore =
+            2600f -
+                    cueToGhostDist * 0.85f -
+                    targetToPocketDist * 0.55f
 
         val ghostLineScore = lineAgreementScore(
             cue.x,
@@ -176,10 +181,10 @@ object ShotCalculator {
 
         val score =
             straightScore +
-            distanceScore +
-            pocketQuality +
-            ghostLineScore -
-            railPenalty
+                    distanceScore +
+                    pocketQuality +
+                    ghostLineScore -
+                    railPenalty
 
         if (score < 400f) return null
 
@@ -257,7 +262,6 @@ object ShotCalculator {
         pockets: List<Pocket>
     ): Float {
         val corner = isCornerPocket(pocket, pockets)
-
         val base = if (corner) 850f else 650f
 
         val dist = distance(
@@ -295,7 +299,9 @@ object ShotCalculator {
         val diff = angleDiff(a1, a2)
         val maxDiff = Math.toRadians(80.0)
 
-        return (1000f * (1f - (diff / maxDiff).toFloat().coerceIn(0f, 1f)))
+        val ratio = (diff / maxDiff).toFloat().coerceIn(0f, 1f)
+
+        return 1000f * (1f - ratio)
     }
 
     private fun railPenalty(
@@ -376,7 +382,9 @@ object ShotCalculator {
         x2: Float,
         y2: Float
     ): Float {
-        return hypot(x1 - x2, y1 - y2)
+        val dx = x1 - x2
+        val dy = y1 - y2
+        return sqrt(dx * dx + dy * dy)
     }
 
     private fun segDist(
