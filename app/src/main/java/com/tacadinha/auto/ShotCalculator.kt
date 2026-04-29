@@ -1,4 +1,4 @@
-package com.tacadinha.pro
+package com.tacadinha.auto
 
 import kotlin.math.*
 
